@@ -99,14 +99,14 @@ hands-on-spring-microservices/service/
     ```
 2. **Run user-service:**
     ```bash
-    cd service/user-service
+    cd services/user-service
     ./mvnw spring-boot:run
     ```
 
 3. **Run department-service:**
     *Open a new terminal window.*
     ```bash
-    cd service/department-service
+    cd services/department-service
     ./mvnw spring-boot:run
     ```
 
