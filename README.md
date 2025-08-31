@@ -115,4 +115,4 @@ hands-on-spring-microservices/service/
     *   Department Service: http://localhost:8082/api/v1/departments
  
 ## Next Step
-*   [Service Discovery with Eureka](https://github.com/your-username/hands-on-spring-microservices/tree/service-discovery)
+*   [Service Discovery with Eureka](https://github.com/your-username/hands-on-spring-microservices/tree/discovery-server)
