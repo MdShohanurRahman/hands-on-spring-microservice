@@ -1,186 +1,121 @@
-# Service Registration and Service Discovery with Eureka
+# API Gateway with Spring Cloud Gateway
 
-In this branch, we introduce the **Eureka Service Discovery Server**, a crucial component for managing how our microservices find and communicate with each other.
+This branch introduces the **API Gateway**, the single entry point for all client requests, which routes them to the appropriate microservice.
 
-## What is Service Discovery?
+## What is an API Gateway?
 
-In a dynamic microservices environment, the network locations (IP addresses and ports) of service instances change frequently due to scaling, failures, or upgrades. **Service Discovery** is the automatic detection of devices and services on a network.
+An API Gateway is a server that acts as an API front-end, receiving API requests, routing them to the correct back-end service, and then returning the response. It is the **front door** for all clients.
 
-### How Eureka Works
+## Why Do We Need It?
 
-1.  **Service Registration:** When a microservice (e.g., `user-service`) starts, it registers itself with the Eureka Server, providing its name and network location.
-2.  **Heartbeat:** The service continuously sends heartbeats to Eureka to signal it is still alive.
-3.  **Service Discovery:** When another service (e.g., `department-service`) needs to call the `user-service`, it asks the Eureka Server for all available instances of `user-service`. Eureka provides the list, and the client uses it to make the request.
+Imagine a client (web/mobile app) needs data from 3 different microservices to load one page. Without a gateway:
+*   The client must know the network addresses of all 3 services.
+*   The client makes **3 separate requests**, which is inefficient and hard to manage.
+*   It exposes internal service structures to the outside world.
 
-This eliminates the need to hardcode the URLs of other services in your application properties.
+An API Gateway solves this by providing:
+1.  **Single Entry Point:** Clients only talk to the gateway.
+2.  **Request Routing:** The gateway forwards requests to the correct service based on the path (e.g., `/users/**` -> `user-service`).
+3.  **Cross-Cutting Concerns:** It centralizes logic for:
+   *   **Authentication & Authorization:** Verify credentials before routing.
+   *   **Rate Limiting:** Prevent abuse.
+   *   **Load Balancing:** Distribute traffic between service instances.
+   *   **CORS:** Handle cross-origin requests in one place.
+   *   **Response Caching:** Cache frequent responses to reduce load.
+
+## Key Terminology
+
+*   **Route:** A set of rules (like a path pattern) defining how to forward a request to a service (e.g., route `/user/**` to `user-service`).
+*   **Predicate:** Conditions that must be true for a route to be matched (e.g., "if the path starts with `/api/users`").
+*   **Filter:** Logic that can be applied to requests before they are forwarded or to responses before they are sent back (e.g., add an HTTP header, log the request).
 
 ## Project Structure Update
+```angular2html
+   hands-on-spring-microservices/services
+   ├── api-gateway/ # NEW: The Spring Cloud Gateway
+   ├── discovery-server/
+   ├── user-service/
+   ├── department-service/
+   └── pom.xml
 ```
-hands-on-spring-microservices/services
-├── discovery-server/ # NEW: The Eureka Server
-├── user-service/
-├── department-service/
-└── pom.xml # NEW: Parent POM
-```
-we'll create a new module called [`discovery-server`](services/discovery-server) for the Eureka Server and update the existing microservices to become Eureka Clients.
-## Parent POM Update
-We need to create the parent [`pom.xml`](pom.xml) to include the new module and manage Spring Cloud dependencies.
+
+
+## New Component: `api-gateway`
+
+This is a standalone Spring Boot application that acts as the gateway.
+
+**Key Dependencies:**
+*   `spring-cloud-starter-gateway`
+*   `spring-cloud-starter-netflix-eureka-client` (So it can discover services from Eureka)
+
 ```xml
-   <modules>
-      <module>services/department-service</module>
-      <module>services/user-service</module>
-      <module>services/discovery-server</module>
-   </modules>
-   <properties>
-      <java.version>24</java.version>
-      <spring-cloud.version>2025.0.0</spring-cloud.version>
-   </properties>
-   <dependencyManagement>
-       <dependencies>
-           <dependency>
-               <groupId>org.springframework.cloud</groupId>
-               <artifactId>spring-cloud-dependencies</artifactId>
-               <version>${spring-cloud.version}</version>
-               <type>pom</type>
-               <scope>import</scope>
-           </dependency>
-       </dependencies>
-   </dependencyManagement>
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+</dependency>
+```
+**Configure [`application.yml`](services/api-gateway/src/main/resources/application.yml):**
+```yaml
+  routes:
+    - id: user-service
+      uri: lb://user-service
+      predicates:
+        - Path=/api/v1/users/**
+
+    - id: department-service
+      uri: lb://department-service
+      predicates:
+        - Path=/api/v1/departments/**
 ```
 
-## New Component: `discovery-server`
+## How It Works
 
-This is a standalone Spring Boot application whose sole purpose is to be the service registry.
+1.  A client sends a request to `http://localhost:8080/api/v1/users/1`.
+2.  The API Gateway, using its defined **routes** and **predicates**, sees that the path matches `/api/v1/users/**`.
+3.  It looks up the `user-service` location from the **Eureka Discovery Server**.
+4.  It uses **client-side load balancing** (Spring Cloud LoadBalancer) to pick an instance.
+5.  It **forwards** the request to that instance (e.g., `http://user-service:8081/api/v1/users/1`).
+6.  It receives the response and sends it back to the client.
 
-1. **Add the** `eureka-server` **dependency.**
-    ```xml
-    <dependency>
-        <groupId>org.springframework.cloud</groupId>
-        <artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
-    </dependency>
-    ```
-2. **Configure its** `application.yml` to point to the Eureka server.
-    ```yaml
-    server:
-      port: 8761
-    eureka:
-      client:
-        register-with-eureka: false
-        fetch-registry: false
-   ```
-3. **Annotate the main class** with `@EnableEurekaClient`.
-    ```java
-    @SpringBootApplication
-    @EnableEurekaServer
-    public class DiscoveryServerApplication {
-        public static void main(String[] args) {
-            SpringApplication.run(DiscoveryServerApplication.class, args);
-        }
-    }
-    ```
+## How to Run
 
-## **Changes to Microservices (**`user-service`, `department-service`)
-
-To become **Eureka Clients**, each microservice needs to:
-
-1. **Add the** `eureka-client` **dependency.**
-    ```xml
-    <dependency>
-      <groupId>org.springframework.cloud</groupId>
-      <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
-    </dependency>
-    ```
-
-2. **Configure its** `application.yml` to point to the Eureka server.
-   ```yaml
-   spring:
-     application:
-       name: <your_service_name> # Unique service name
-   eureka:
-     client:
-       service-url:
-         defaultZone: http://localhost:8761/eureka/ # Eureka Server URL
-       register-with-eureka: true # Register this service with Eureka
-       fetch-registry: true # Fetch registry info from Eureka
-     instance:
-       prefer-ip-address: true # Use IP address for registration
-   ```
-
-3. **Annotate the main class** with `@EnableDiscoveryClient`.
-   `@EnableDiscoveryClient` is optional if you are using Spring Cloud dependencies that autoconfigure service discovery (like with Spring Boot 2.x+ and Spring Cloud).
-    ```java
-    @SpringBootApplication
-    @EnableDiscoveryClient
-    public class UserServiceApplication {
-         public static void main(String[] args) {
-              SpringApplication.run(UserServiceApplication.class, args);
-         }
-    }
-    ```
-    ```java
-    @SpringBootApplication
-    @EnableDiscoveryClient
-    public class DepartmentServiceApplication {
-            public static void main(String[] args) {
-                SpringApplication.run(DepartmentServiceApplication.class, args);
-            }
-    }
-   ```
-
-
-## **How to Run**
-
-1. **Start the Discovery Server first:**
+1.  **Start the supporting services first:**
     ```bash
     cd services/discovery-server
     ./mvnw spring-boot:run
     ```
-   *The Eureka Dashboard will be available at:* [*http://localhost:8761*](http://localhost:8761/)
 
-2. **Start the microservices:**  
-   *In separate terminals, start* `user-service` and `department-service`.
-
+2.  **Start the microservices:**
     ```bash
     cd services/user-service
     ./mvnw spring-boot:run
+
+    cd services/department-service
+    ./mvnw spring-boot:run
     ```
-   
+
+3.  **Start the API Gateway:**
     ```bash
-   cd services/department-service
-   ./mvnw spring-boot:run
+    cd services/api-gateway
+    ./mvnw spring-boot:run
     ```
 
-3. **Observe:** Refresh the Eureka Dashboard ([http://localhost:8761](http://localhost:8761/)). You will see both services registered under "Instances currently registered with Eureka".
+## Testing the Flow
 
-## Example DiscoveryClient Usage
-In `department-service`, you can use `DiscoveryClient` to programmatically discover instances of `user-service`.
+*   **Old Way (Direct Call):** http://localhost:8081/api/v1/users
+*   **New Way (Through Gateway):** http://localhost:8080/api/v1/users
 
-```java
-   @Autowired
-   private RestClient restClient;
-   @Autowired
-   private DiscoveryClient discoveryClient;
+The gateway is now running on port **8080**. All client requests should be sent to this port. The gateway will seamlessly route them to the correct service on ports 8081 or 8082.
 
-    public List<User> getUsers() {
-         List<ServiceInstance> instances = discoveryClient.getInstances("user-service");
-         if (instances.isEmpty()) {
-              throw new IllegalStateException("No instances of user-service found");
-         }
-         String userServiceUrl = instances.getFirst().getUri().toString();
-         return restClient.get()
-                 .uri(userServiceUrl + "/api/v1/users")
-                 .retrieve()
-                 .body(String.class);
-    }
-```
+---
 
-## **What We Achieved**
-
-* **Centralized Registry:** We now have a single source of truth for all running service instances.
-
-* **Dynamic Routing:** Services can now find each other by name instead of hardcoded URL.
-
-* **Resilience:** If a service instance goes down, Eureka will eventually remove it from the registry, preventing requests from being sent to a failed instance.
-
+## References
+*   [Spring Cloud Gateway Documentation](https://docs.spring.io/spring-cloud-gateway/reference/index.html)
+*   [A Comprehensive Guide](https://medium.com/@gauravraisinghani1998/implementing-spring-cloud-gateway-a-comprehensive-guide-3498aaacfdca)
+---
 ## Next Step
-*   [Spring Could Api Gateway](https://github.com/MdShohanurRahman/hands-on-spring-microservices/tree/api-gateway)
+*   [Centralized Configuration with spring cloud config server](https://github.com/MdShohanurRahman/hands-on-spring-microservices/tree/config-server)

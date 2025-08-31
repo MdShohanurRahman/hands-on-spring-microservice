@@ -23,6 +23,7 @@
         <module>services/department-service</module>
         <module>services/user-service</module>
         <module>services/discovery-server</module>
+        <module>services/api-gateway</module>
     </modules>
 
     <properties>
