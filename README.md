@@ -6,6 +6,8 @@ In this branch, we introduce the **Eureka Service Discovery Server**, a crucial 
 
 In a dynamic microservices environment, the network locations (IP addresses and ports) of service instances change frequently due to scaling, failures, or upgrades. **Service Discovery** is the automatic detection of devices and services on a network.
 
+![Discovery Server Diagram](resources/discovery-server.jpg)
+
 ### How Eureka Works
 
 1.  **Service Registration:** When a microservice (e.g., `user-service`) starts, it registers itself with the Eureka Server, providing its name and network location.
