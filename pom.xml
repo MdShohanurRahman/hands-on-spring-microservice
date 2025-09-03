@@ -24,12 +24,20 @@
         <module>services/user-service</module>
         <module>services/discovery-server</module>
         <module>services/api-gateway</module>
+        <module>services/config-server</module>
     </modules>
 
     <properties>
         <java.version>24</java.version>
         <spring-cloud.version>2025.0.0</spring-cloud.version>
     </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+    </dependencies>
 
     <dependencyManagement>
         <dependencies>
