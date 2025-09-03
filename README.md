@@ -188,4 +188,4 @@ In `department-service`, you can use `DiscoveryClient` to programmatically disco
 *   [Spring Cloud Netflix Eureka Documentation](https://docs.spring.io/spring-cloud-netflix/docs/current/reference/html/)
 
 ## Next Step
-*   [Spring Could Api Gateway](https://github.com/MdShohanurRahman/hands-on-spring-microservices/tree/api-gateway)
+*   [Spring Could Api Gateway](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/api-gateway)
