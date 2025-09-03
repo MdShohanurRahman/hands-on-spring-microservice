@@ -184,5 +184,8 @@ In `department-service`, you can use `DiscoveryClient` to programmatically disco
 
 * **Resilience:** If a service instance goes down, Eureka will eventually remove it from the registry, preventing requests from being sent to a failed instance.
 
+## Resources
+*   [Spring Cloud Netflix Eureka Documentation](https://docs.spring.io/spring-cloud-netflix/docs/current/reference/html/)
+
 ## Next Step
 *   [Spring Could Api Gateway](https://github.com/MdShohanurRahman/hands-on-spring-microservices/tree/api-gateway)
