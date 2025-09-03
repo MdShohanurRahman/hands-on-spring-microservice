@@ -37,7 +37,7 @@ Follow the branches in order to build the system incrementally:
     ```
 2.  Check out the branch you want to explore:
     ```bash
-    git checkout 1.Introduction
+    git checkout introduction
     ```
 3.  Follow the instructions in the branch's `README.md` to run the code.
 
