@@ -6,6 +6,8 @@ This branch introduces the **API Gateway**, the single entry point for all clien
 
 An API Gateway is a server that acts as an API front-end, receiving API requests, routing them to the correct back-end service, and then returning the response. It is the **front door** for all clients.
 
+![API Gateway Diagram](resources/api-gateway.png)
+
 ## Why Do We Need It?
 
 Imagine a client (web/mobile app) needs data from 3 different microservices to load one page. Without a gateway:
