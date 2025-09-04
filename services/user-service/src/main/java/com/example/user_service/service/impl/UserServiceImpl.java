@@ -1,6 +1,9 @@
 package com.example.user_service.service.impl;
 
+import com.example.user_service.client.DepartmentClient;
+import com.example.user_service.dto.DepartmentDto;
 import com.example.user_service.dto.UserDto;
+import com.example.user_service.dto.UserWithDepartmentDto;
 import com.example.user_service.entity.UserEntity;
 import com.example.user_service.repository.UserRepository;
 import com.example.user_service.service.UserService;
@@ -16,9 +19,11 @@ import java.util.stream.Collectors;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final DepartmentClient departmentClient;
 
-    public UserServiceImpl(UserRepository userRepository) {
+    public UserServiceImpl(UserRepository userRepository, DepartmentClient departmentClient) {
         this.userRepository = userRepository;
+        this.departmentClient = departmentClient;
     }
 
     private UserDto mapToDto(UserEntity entity) {
@@ -85,5 +90,12 @@ public class UserServiceImpl implements UserService {
             throw new NoSuchElementException("User not found with id: " + id);
         }
         userRepository.deleteById(id);
+    }
+
+    @Override
+    public UserWithDepartmentDto getUserWithDepartment(Long userId) {
+        UserDto userDto = getUserById(userId);
+        DepartmentDto department = departmentClient.getDepartmentById(userDto.getDepartmentId());
+        return new UserWithDepartmentDto(userDto, department);
     }
 }

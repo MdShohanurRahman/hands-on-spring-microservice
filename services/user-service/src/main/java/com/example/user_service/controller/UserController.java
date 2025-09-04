@@ -1,6 +1,7 @@
 package com.example.user_service.controller;
 
 import com.example.user_service.dto.UserDto;
+import com.example.user_service.dto.UserWithDepartmentDto;
 import com.example.user_service.service.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -43,5 +44,10 @@ public class UserController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/with-department")
+    public ResponseEntity<UserWithDepartmentDto> getUserWithDepartment(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.getUserWithDepartment(id));
     }
 }

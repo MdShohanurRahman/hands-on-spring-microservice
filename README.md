@@ -1,230 +1,115 @@
-# Centralized Configuration with Spring Cloud Config Server
+# Declarative REST Clients with OpenFeign
 
-This branch introduces the **Spring Cloud Config Server**, which provides centralized external configuration management for all microservices across all environments.
+This branch introduces **OpenFeign**, a declarative web service client that dramatically simplifies making HTTP requests between microservices.
 
-## What is it?
+## What is OpenFeign?
 
-The Config Server is a standalone service that manages external properties for applications across all environments. Instead of having configuration files (like `application.properties`) bundled inside each microservice's JAR, they are stored in a centralized, version-controlled repository (e.g., Git).
+OpenFeign is a library that makes writing web service clients easier. You define an interface and annotate it. Feign automatically translates these annotations into HTTP requests at runtime. It integrates seamlessly with service discovery (Eureka) and client-side load balancing.
 
-![Config Server Diagram](resources/config-server.png)
+![Open Feign Diagram](resources/open-feign.png)
 
 ## Why Do We Need It?
 
-Imagine you have 50 microservices running. Without a config server:
-*   **Changing a config** (e.g., a database URL) requires repackaging and redeploying each affected service.
-*   **Environment-specific configs** (dev, staging, prod) are hard to manage and prone to error.
-*   **Secrets** like passwords are embedded in code, which is a security risk.
+Without OpenFeign, to call another service (e.g., `user-service` calling `department-service`), you would have to use a low-level client like `RestTemplate` or `WebClient`. This involves:
+*   **Boilerplate Code:** Writing URL building, request execution, and response parsing code every time.
+*   **Manual Service Discovery:** You have to manually look up the service instance from Eureka using its `ApplicationServiceInstanceListSupplier`.
+*   **Error Handling:** Manually handling timeouts, exceptions, and retries.
 
-A Config Server solves this by:
-1.  **Single Source of Truth:** All configuration is stored in one place (a Git repo).
-2.  **Environment-Specific Configs:** Easily manage different properties for dev, QA, and prod.
-3.  **Dynamic Refresh:** Change configuration on the fly without restarting services (using Spring Boot Actuator and `@RefreshScope`).
-4.  **Encryption:** Encrypt sensitive information like passwords.
-
-## Key Terminology
-
-*   **Config Server:** The central server that serves configuration files to client applications.
-*   **Config Client:** A microservice that fetches its configuration from the Config Server on startup.
-*   **Backend Repository:** The version-controlled storage (e.g., Git, SVN, filesystem) where the configuration files are physically stored.
-*   **Profile:** A Spring profile (e.g., `dev`, `prod`) that determines which configuration file is loaded (e.g., `user-service-dev.properties`).
+OpenFeign solves this by providing:
+1.  **Declarative Style:** Define the HTTP API as a Java interface. No implementation needed.
+2.  **Integration with Eureka:** Automatically resolves service names from Eureka into actual URLs.
+3.  **Built-in Load Balancing:** Automatically distributes requests among available service instances (using Spring Cloud LoadBalancer).
+4.  **Clean Code:** Eliminates all the boilerplate HTTP client code.
 
 ## How It Works
 
-1.  On startup, a **Config Client** (e.g., `user-service`) connects to the **Config Server**.
-2.  The client identifies itself with its `spring.application.name` and active `profile`.
-3.  The Config Server fetches the appropriate configuration file (e.g., `user-service.properties` or `user-service-dev.properties`) from the **Git repository** or file store.
-4.  The Config Server sends this configuration back to the client.
-5.  The client application boots with these external properties.
+1.  You define an interface with methods annotated with Spring MVC annotations (`@RequestMapping`, `@GetMapping`, `@PostMapping`, etc.).
+2.  You enable Feign clients in your application.
+3.  At startup, Spring creates a dynamic proxy implementation of your interface.
+4.  When you call a method on this interface, Feign:
+    *   Contacts the **Discovery Client** (Eureka) to get the list of instances for the service name.
+    *   Uses the **LoadBalancer** to pick an instance.
+    *   Constructs the HTTP request based on the annotation.
+    *   Makes the network call.
+    *   Decodes the response and returns it.
 
-## Project Structure Update
-```
-hands-on-spring-microservices/services
-├── config-server/ # NEW: The Spring Cloud Config Server
-├── config-data/ # NEW: Local Git repo for config files (for demo)
-├── api-gateway/
-├── discovery-server/
-├── user-service/
-├── department-service/
-└── pom.xml
-```
+## Project Changes
 
-## New Component: `config-server`
+We will demonstrate this by enabling communication between our services. For example, when fetching a user, we might also want to get their department details.
 
-This is a standalone Spring Boot application that acts as the configuration server.
+**Use Case:** The `user-service` will use OpenFeign to call the `department-service`.
 
-**Key Dependencies:**
-```xml
+## How to Integrate OpenFeign
+
+* Add Dependency to Microservices
+
+    Add the OpenFeign starter to the `pom.xml` of any service that needs to call another service (e.g., `user-service`).
+    ```xml
+    <!-- In user-service/pom.xml -->
     <dependency>
-      <groupId>org.springframework.cloud</groupId>
-      <artifactId>spring-cloud-config-server</artifactId>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-openfeign</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.springframework.cloud</groupId>
-      <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
-    </dependency>
-```
+    ```
+* Enable Feign Clients
 
-## Setting Up the Config Server
-1. **Enable Config Server** by adding `@EnableConfigServer` in the main application class.
+    In the main application class of the service that will use Feign (e.g., `UserServiceApplication`), add the `@EnableFeignClients` annotation.
     ```java
     @SpringBootApplication
-    @EnableConfigServer
-    @EnableDiscoveryClient
-    public class ConfigServerApplication {
-         public static void main(String[] args) {
-              SpringApplication.run(ConfigServerApplication.class, args);
-         }
+    @EnableFeignClients
+    public class UserServiceApplication {
+        public static void main(String[] args) {
+            SpringApplication.run(UserServiceApplication.class, args);
+        }
     }
     ```
-2. **Set up the `application.yml`** to point to the backend local filesystem or Git repository.
+* Define a Feign Client Interface
 
-   **Example `application.yml` for a local filesystem:**
-    ```yaml
-    spring:
-      cloud:
-         config:
-            server:
-              native:
-                search-locations: classpath:/configs
-   ```
-   create a folder `configs` inside `resources` and add configuration files for each service and profile:
-       *   `user-service.yml`
-       *   `department-service.yml`
-   for simplicity we're just using user-service and department-service. You can add more services as needed.
-
-   **Example `application.yml` for a Git backend:**
-   ```yaml
-   spring:
-     cloud:
-       config:
-         server:
-           git:
-             uri: <YOUR_GIT_REPO_URL>
-             default-label: main
-             username: <YOUR_GIT_USERNAME>
-             password: <YOUR_GIT_USER_ACCESS_TOKEN>
-   ```
-   create a local Git repository (`config-data`) for simplicity. In a real scenario, this would be a remote repo like GitHub.
-   1.  **Create the `config-data` directory** and initialize it as a Git repo.
-   2.  **Create configuration files** for each service and profile inside this repo:
-       *   `user-service.yml`
-       *   `department-service.yml`
-
-**Note:** Here application name is same as the file name. So for `user-service`, the config file is `user-service.yml`.
-
-Now, we need to register config server with eureka server so that other services can discover it. Add the following to `application.yml` of config server.
-
-```yaml
-  eureka:
-      client:
-        service-url:
-          defaultZone: http://localhost:8761/eureka/
-      instance:
-        prefer-ip-address: true
-```
-
-## Changes to Microservices (Config Clients)
-
-To become **Config Clients**, each microservice needs to:
-1.  **Add the `config-client` dependency.**
-    ```xml
-        <dependency>
-          <groupId>org.springframework.cloud</groupId>
-          <artifactId>spring-cloud-starter-config</artifactId>
-        </dependency>
-    ``` 
-2.  Configure `application.yml`
-    ```yaml
-    spring:
-      application:
-        name: <YOUR_APPLICATION_NAME> # Must match the config file name 
-      config:
-        import: optional:configserver:http://localhost:8888 # URL of the Config Server
+    Create an interface that defines the methods to call the other service. Annotate it with `@FeignClient`, specifying the service name registered in Eureka.
+    Example: [`DepartmentClient.java`](services/user-service/src/main/java/com/example/user_service/client/DepartmentClient.java) in `user-service`
+    ```java
+    @FeignClient(name = "department-service")
+    public interface DepartmentClient {
+        @GetMapping("/api/v1/departments/{id}")
+        DepartmentDto getDepartmentById(@PathVariable("id") Long id);
+    }
     ```
-    * optional: — If the config server is unavailable, the app will still start (fail-fast is disabled).
-    * configserver: — This is a special prefix for Spring Cloud to recognize the config server.
-    * http://localhost:8888 — The address where your config server is running.
+* Use the Feign Client in Your Service
 
-3.  remove any existing `application.properties` or `application.yml` files from the microservice, as they will now fetch configuration from the Config Server.
-
-## How to Run
-
-1.  **Start the foundational services first:**
-    ```bash
-    cd services/discovery-server
-    ./mvnw spring-boot:run
-
-    cd services/config-server
-    ./mvnw spring-boot:run
-    
-    cd services/api-gateway
-    ./mvnw spring-boot:run
+    Inject the Feign client interface into your service class and use it to make calls to the other service.
+    Example: [`UserService.java`](services/user-service/src/main/java/com/example/user_service/service/UserService.java) in `user-service`
+    ```java
+    @Service
+    public class UserService {
+        private final DepartmentClient departmentClient;
+        
+        public UserWithDepartmentDto getUserWithDepartment(Long userId) {
+            UserDto userDto = getUserById(userId);
+            DepartmentDto department = departmentClient.getDepartmentById(userDto.getDepartmentId());
+            return new UserWithDepartmentDto(userDto, department);
+    }
+    }
     ```
-
-2.  **Start a microservice (Config Client):**
-    ```bash
-    cd services/user-service
-    ./mvnw spring-boot:run
+   Example: [`UserController.java`](services/user-service/src/main/java/com/example/user_service/controller/UserController.java) in `user-service`
+    ```java
+    @RestController
+    @RequestMapping("/api/v1/users")
+    public class UserController {
+        private final UserService userService;
+        
+        @GetMapping("/{id}/with-department")
+        public ResponseEntity<UserWithDepartmentDto> getUserWithDepartment(@PathVariable Long id) {
+            UserWithDepartmentDto userWithDepartment = userService.getUserWithDepartment(id);
+            return ResponseEntity.ok(userWithDepartment);
+        }
+    }
     ```
-    ```bash
-    cd services/user-service
-    ./mvnw spring-boot:run
-    ```
-3.  **Observe the logs:** Look for logs in the `user-service` startup indicating it is fetching configuration from the Config Server.
-
-## Testing the Flow
-
-* The `user-service` will no longer use its bundled `application.yml`.
-* Instead, it will use the properties defined in the `configs/user-service.yml` file.
-* Hit http://localhost:8888/user-service/default to see the service in action. You can also hit dev, qa, prod profiles by changing the URL to http://localhost:8088/user-service/dev, etc.
-
----
-
-### Auto Refresh Configuration
-We now have centralized config management. The next step is to enable **dynamic configuration refreshes without restarting** the services, using Spring Boot Actuator's `refresh` endpoint. This will be part of a future advanced configuration branch.
-Add actuator dependency in parent [`pom.xml`](/pom.xml):
-```xml
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-actuator</artifactId>
-    </dependency>
-```
-**Key Dependencies:**
-```xml
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-actuator</artifactId>
-    </dependency>
-```
-update `application.yml` of config client as below:
-```yaml
-management:
-  endpoints:
-    web:
-      exposure:
-        include: refresh # Expose the refresh endpoint
-```
-Add `@RefreshScope` to any `@Component`, `@Service`, or `@RestController` where you want properties to be refreshed dynamically.
-
-```java
-@RestController
-@RefreshScope
-public class UserController {
-    @Value("${some.config.property}")
-    private String configProperty;
-    // ...
-}
-```
-Now, when you change a property in the config repository and commit it, you can trigger a refresh by sending a POST request to the `/actuator/refresh` endpoint of the microservice.
-
-```bash
-curl -X POST <APPLICATION_SERVER_URL>/actuator/refresh
-```
-This will refresh the configuration properties in that service without needing a restart.
-
-## Resources
-* [Spring Cloud Config Documentation](https://spring.io/projects/spring-cloud-config)
-* [Encryption and Decryption](https://docs.spring.io/spring-cloud-config/reference/server/encryption-and-decryption.html)
+## Testing the Integration
+* Start all services: `discovery-server`, `config-server`, `api-gateway` `department-service`, and `user-service`.
+* Call the new endpoint: GET http://localhost:8080/api/v1/users/1/with-department
+* This request goes through the API Gateway to the `user-service`.
+* The `user-service` uses OpenFeign to call the `department-service` internally.
 
 ## Next Step
-* [Inter Service Communication with Feign Client](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/open-feign)
+Now that our services are communicating, we must make this communication resilient. A single slow or failing service can bring down the whole system. The next branch will introduce Resilience4j for circuit breaking, retries, and rate limiting to build fault-tolerant microservices.
+* [Fault Tolerance with Resilience4j](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/fault-tolerance)
