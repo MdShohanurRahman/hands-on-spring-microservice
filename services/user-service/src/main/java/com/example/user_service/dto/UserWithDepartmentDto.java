@@ -10,6 +10,6 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 public class UserWithDepartmentDto {
-    private UserDto userDto;
-    private DepartmentDto departmentDto;
+    private UserDto user;
+    private DepartmentDto department;
 }
