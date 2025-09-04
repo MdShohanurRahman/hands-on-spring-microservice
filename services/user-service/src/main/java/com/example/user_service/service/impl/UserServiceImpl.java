@@ -7,6 +7,8 @@ import com.example.user_service.dto.UserWithDepartmentDto;
 import com.example.user_service.entity.UserEntity;
 import com.example.user_service.repository.UserRepository;
 import com.example.user_service.service.UserService;
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +18,7 @@ import java.util.stream.Collectors;
 
 @Service
 @Transactional
+@Slf4j
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;

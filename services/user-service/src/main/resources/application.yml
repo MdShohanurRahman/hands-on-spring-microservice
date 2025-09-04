@@ -3,3 +3,53 @@ spring:
     name: user-service
   config:
     import: optional:configserver:http://localhost:8888
+
+  # Enable Feign's Resilience4j integration
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+
+resilience4j:
+  retry:
+    configs:
+      default:
+        max-attempts: 3
+        wait-duration: 1s
+    instances:
+      default:
+        base-config: default
+        wait-duration: 500ms
+      userServiceRetry:
+        base-config: default
+        wait-duration: 200ms
+  ratelimiter:
+    instances:
+      default:
+        limit-for-period: 1
+        limit-refresh-period: 5s
+        timeout-duration: 1ms
+  bulkhead:
+    instances:
+      default:
+        max-concurrent-calls: 20
+  circuitbreaker:
+    instances:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        slidingWindowType: COUNT_BASED
+        minimumNumberOfCalls: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 1s
+        permittedNumberOfCallsInHalfOpenState: 3
+        eventConsumerBufferSize: 10
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,circuitbreakers,metrics
+  endpoint:
+    health:
+      show-details: always
