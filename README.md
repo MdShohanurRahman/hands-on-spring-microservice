@@ -40,7 +40,7 @@ Fault tolerance is the ability of a system to continue operating properly in the
     *   `OPEN`: Requests fail immediately for a duration. Gives the failing service time to recover.
     *   `HALF-OPEN`: After the duration, allow a few test requests to check if the service is back.
 *   **When to use:** To prevent cascading failures and avoid overwhelming a failing service. Essential for protecting your system.
-* 
+
 ![circuit-breaker-states](/resources/circuit-breaker.jpg)
 
 ## How to Integrate Resilience4j with OpenFeign
@@ -123,6 +123,7 @@ resilience4j:
     }
       ```
  * Fallback methods in different class
+
     Before using fallback with Feign clients, you must enable Feign's Resilience4j integration in your application.yml or application.properties.
     `spring.cloud.openfeign.circuitbreaker.enabled=true`
 
@@ -165,9 +166,10 @@ management:
     health:
       show-details: always
 ```
-You can access the circuit breaker status at the following endpoint:
-`http://localhost:8080/actuator/circuitbreakers`
+You can access the circuit breaker status at `http://localhost:8080/actuator/circuitbreakers`
+
 This endpoint provides information about the state of each circuit breaker, including metrics like the number of successful and failed calls.
+
 You can also access detailed metrics at:
 `http://localhost:8080/actuator/metrics/resilience4j.circuitbreaker.calls`
 
