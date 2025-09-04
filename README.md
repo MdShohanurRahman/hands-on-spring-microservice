@@ -110,6 +110,9 @@ We will demonstrate this by enabling communication between our services. For exa
 * This request goes through the API Gateway to the `user-service`.
 * The `user-service` uses OpenFeign to call the `department-service` internally.
 
+## Resources
+* [OpenFeign Documentation](https://docs.spring.io/spring-cloud-openfeign/docs/current/reference/html/)
+
 ## Next Step
 Now that our services are communicating, we must make this communication resilient. A single slow or failing service can bring down the whole system. The next branch will introduce Resilience4j for circuit breaking, retries, and rate limiting to build fault-tolerant microservices.
 * [Fault Tolerance with Resilience4j](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/fault-tolerance)
