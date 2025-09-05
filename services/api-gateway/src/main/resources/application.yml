@@ -23,3 +23,8 @@ eureka:
   instance:
     prefer-ip-address: true
 
+management:
+  tracing:
+    enabled: true
+    sampling:
+      probability: 0.1

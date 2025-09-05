@@ -1,186 +1,150 @@
-# Building Resilient Microservices with Resilience4j
+# Distributed Tracing with Zipkin and Micrometer
 
-This branch introduces **Resilience4j**, a lightweight fault tolerance library designed for Java 8 and functional programming. We will integrate it to make our service-to-service communication resilient to failures.
+This branch introduces **Distributed Tracing**, a method used to profile and monitor applications, especially those built using a **microservices** architecture. We will use **Micrometer** for metrics collection and **Zipkin** for visualizing them.
 
-## What is Fault Tolerance?
+## What is Distributed Tracing?
 
-Fault tolerance is the ability of a system to continue operating properly in the event of the failure of some of its components. In microservices, the failure of one service should not cascade and bring down the entire system.
+Distributed tracing is a technique for tracking a request as it propagates through a distributed system, like your microservices. It gives you a complete view of the journey of a single user request, showing you which services it touched, how long each step took, and where errors occurred.
 
-## Why Do We Need It? A Real-Life Use Case
+## Why Do We Need It? A Real-Life Scenario
 
-**Scenario:** Our `user-service` calls the `department-service` using OpenFeign to get department details for a user.
+**Scenario:** A user reports that loading their profile page is very slow.
 
-**What happens if `department-service` is slow or down?**
-*   The thread in `user-service` waiting for a response gets blocked.
-*   As more requests for users come in, more threads get blocked.
-*   Eventually, `user-service` runs out of threads and becomes unresponsive itself. This is a **cascading failure**.
+**Without Tracing:** You have to manually check the logs of the API Gateway, `user-service`, `department-service`, and any other involved service. Correlating logs for a single request across all these services is like finding a needle in a haystack.
 
-**Solution:** Implement fault tolerance patterns to handle the failure gracefully, for example:
-*   **Retry:** Maybe the failure is temporary.
-*   **Circuit Breaker:** Stop making requests if the failure is persistent.
-*   **Fallback:** Return a default response instead of failing completely (e.g., show the user without department details).
+**With Tracing:** You have a unique **trace ID** assigned to the user's request. You can use this ID in Zipkin's UI to instantly see a visual timeline (a "trace") of the entire request:
+*   You see the request entered through the API Gateway.
+*   You see it took 150ms in the `user-service`.
+*   You see the `user-service` then called the `department-service`, which took 2000ms to respond.
+*   **Instantly, you identify the bottleneck:** The `department-service` is the cause of the slowdown.
 
-## Core Resilience4j Patterns
+## Key Terminology
 
-### 1. Retry
-*   **What it does:** Automatically retries a failed operation a specified number of times.
-*   **When to use:** For transient, temporary failures (e.g., network glitch, service temporarily unavailable). Do not use for permanent errors (e.g., `404 Not Found`, `400 Bad Request`).
+*   **Trace:** The entire journey of a single request, from its starting point (e.g., the API Gateway) through all the services it touches.
+*   **Span:** A single operation within a trace. It represents a unit of work (e.g., an HTTP call, a database query). A trace is a tree of spans.
+*   **Trace ID:** A unique identifier that is assigned to a single request and remains constant as it flows through the system. This is what links all the logs and spans together.
+*   **Span ID:** A unique identifier for a specific operation within a trace.
+*   **Zipkin:** A distributed tracing system that gathers timing data and provides a UI for visualizing traces.
+*   **Micrometer:** A metrics collection library that integrates with various monitoring systems, including Zipkin.
 
-### 2. Rate Limiter
-*   **What it does:** Limits the number of calls to a service in a specific time period.
-*   **When to use:** To protect a service from being overwhelmed by too many requests (e.g., to prevent denial-of-service, accidental or intentional).
+## How It Works
 
-### 3. Bulkhead
-*   **What it does:** Limits the number of concurrent calls to a service. This isolates failures to a part of the system, preventing a single slow service from consuming all resources (e.g., all threads).
-*   **When to use:** To ensure one misbehaving service doesn't use all the threads in your application, starving other healthy operations.
+1.  **Request In:** A request enters the system (e.g., at the API Gateway). Sleuth generates a **Trace ID** and a **Span ID** for it.
+2.  **Propagation:** When one service (e.g., `api-gateway`) calls another (e.g., `user-service`), Sleuth automatically adds the Trace ID and Span ID to the HTTP headers of the outgoing request.
+3.  **Logging:** Each service's logs now contain the `[app-name,trace-id,span-id]` information, making it easy to filter logs for a specific request.
+4.  **Exporting:** Each service sends its timing data (spans) to a **Zipkin server**.
+5.  **Visualization:** You use the Zipkin UI to search for traces by service, time, or even error, and see a detailed timeline of the request's flow.
 
-### 4. Circuit Breaker
-*   **What it does:** Prevents a service from repeatedly trying to execute an operation that's likely to fail. It transitions between `CLOSED`, `OPEN`, and `HALF-OPEN` states.
-    *   `CLOSED`: Everything is fine, requests pass through.
-    *   `OPEN`: Requests fail immediately for a duration. Gives the failing service time to recover.
-    *   `HALF-OPEN`: After the duration, allow a few test requests to check if the service is back.
-*   **When to use:** To prevent cascading failures and avoid overwhelming a failing service. Essential for protecting your system.
-* 
-![circuit-breaker-states](/resources/circuit-breaker.jpg)
+![zipkin-trace-example](/resources/zipkin-tracing.png)
 
-## How to Integrate Resilience4j with OpenFeign
+## Project Changes
 
-Resilience4j integrates seamlessly with Spring Cloud OpenFeign. The configuration is primarily done in the `application.properties` file.
+We will add Zipkin server and configure all our services to send trace data to it.
 
-### 1. Add Dependencies
-
-Add the Resilience4j starter to the service making the calls (e.g., `user-service`).
-
-**`user-service/pom.xml`:**
-```xml
-<dependency>
-    <groupId>org.springframework.cloud</groupId>
-    <artifactId>spring-cloud-starter-circuitbreaker-resilience4j</artifactId>
-</dependency>
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-aop</artifactId>
-</dependency>
+## How to Integrate
+### 1. Set Up Zipkin Server
+You can run Zipkin server using Docker. If you have Docker installed, you can start a Zipkin server with the following command:
+```bash
+  docker run -d -p 9411:9411 openzipkin/zipkin
 ```
-### 2. Configure Resilience4j in [`application.yml`](services/user-service/src/main/resources/application.yml)
-
+or use Docker Compose by adding the following service to your [`docker-compose.yml`](./docker-compose.yml):
 ```yaml
-resilience4j:
-  retry:
-    configs:
-      default:
-        max-attempts: 3 # The operation will be retried up to 3 times before failing.
-        wait-duration: 10s # There will be a 10-second wait between each retry attempt.
-    instances:
-      userServiceRetry: # Replace with the name of your Feign client or service or default.
-        base-config: default # Inherit settings from the 'default' config above.
-        wait-duration: 200ms # Override: for this instance, wait 200ms between retries.
-    ratelimiter:
-      instances:
-        default:
-          limit-for-period: 1 # Only 1 call is allowed per refresh period.
-          limit-refresh-period: 5s # The rate limit resets every 5 seconds.
-          timeout-duration: 1ms # If a call cannot be made immediately, it will wait up to 1 millisecond before failing.
-    bulkhead:
-      instances:
-        default:
-          max-concurrent-calls: 20 # Up to 20 concurrent calls are allowed.
-    circuitbreaker:
-      instances:
-        default:
-          registerHealthIndicator: true  # Expose circuit breaker health via the actuator
-          slidingWindowSize: 10          # Size of the sliding window for call recording
-          slidingWindowType: COUNT_BASED # Use count-based sliding window
-          minimumNumberOfCalls: 10       # Minimum number of calls before calculating failure rate
-          failureRateThreshold: 50       # If 50% (5 out of 10) calls fail, the circuit goes to OPEN state
-          waitDurationInOpenState: 1s   # Time the circuit stays OPEN before moving to HALF_OPEN
-          permittedNumberOfCallsInHalfOpenState: 3  # Number of test calls in HALF_OPEN state
-          eventConsumerBufferSize: 10    # Buffer size for event logs
+   zipkin:
+     container_name: zipkin
+     image: openzipkin/zipkin
+     ports:
+       - "9411:9411"
 ```
-### 3. Implement Fallback Methods
- * Available annotations
-    * `@Retry`
-    * `@RateLimiter`
-    * `@Bulkhead`
-    * `@CircuitBreaker`
-    
-  All these annotations have a `fallbackMethod` attribute to specify the fallback method to be called when the main method fails.
+Then run:
+```bash 
+  docker-compose up -d zipkin
+```
+Or alternatively, you can download and run the Zipkin server jar directly:
+```bash
+    wget -O zipkin.jar https://search.maven.org/remotecontent?filepath=io/zipkin/java/zipkin-server/2.23.2/zipkin-server-2.23.2-exec.jar
+    java -jar zipkin.jar
+```
+### 2. Add Dependencies to ALL Services
 
- * Fallback methods in same class
-     ```java
-    @FeignClient(name = "department-service", path = "/api/v1/departments")
-    public interface DepartmentClient {
-    
-        @GetMapping("/{id}")
-        @Retry(name = "department-service", fallbackMethod = "getUserWithDepartmentFallback")
-        DepartmentDto getDepartmentById(@PathVariable("id") Long id);
-   
-        
-        default DepartmentDto getUserWithDepartmentFallback(Long id, Throwable throwable) {
-            // Fallback logic: return a default DepartmentDto or handle the error as needed
-            return new DepartmentDto(); // Return an empty or default department
-        }
-    }
-      ```
- * Fallback methods in different class
-    Before using fallback with Feign clients, you must enable Feign's Resilience4j integration in your application.yml or application.properties.
-    `spring.cloud.openfeign.circuitbreaker.enabled=true`
+Every service that should be traced (API Gateway, `user-service`, `department-service`) needs the Sleuth and Zipkin dependencies.
 
-    ```java
-    @FeignClient(name = "department-service", path = "/api/v1/departments", fallback = DepartmentClientFallback.class)
-    public interface DepartmentClient {
-        @GetMapping("/{id}")
-        DepartmentDto getDepartmentById(@PathVariable("id") Long id);
-    }
-    
-    @Component
-    public class DepartmentClientFallback implements DepartmentClient {
-        @Override
-        public DepartmentDto getDepartmentById(Long id) {
-            // Fallback logic: return a default DepartmentDto or handle the error as needed
-            return new DepartmentDto(); // Return an empty or default department
-        }
-    }
-    ```
-   
-### 4. Monitor Circuit Breaker Status
-Resilience4j provides integration with Spring Boot Actuator, allowing you to monitor the status of your circuit breakers.
-Add the Actuator dependency if not already present:
-
+**Add to each service's `pom.xml`:**
 ```xml
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-actuator</artifactId>
-</dependency>
-```
-Make sure to enable the necessary actuator endpoints in your [`application.yml`](services/user-service/src/main/resources/application.yml) :
+    <!-- add actuator if not added  -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
 
-```yaml
+    <!-- Micrometer and Zipkin dependencies -->
+    <dependency>
+        <groupId>io.micrometer</groupId>
+        <artifactId>micrometer-observation</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>io.micrometer</groupId>
+        <artifactId>micrometer-tracing-bridge-brave</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>io.zipkin.reporter2</groupId>
+        <artifactId>zipkin-reporter-brave</artifactId>
+    </dependency>
+
+    <!-- for tracing openfeign outgoing request-->
+    <dependency>
+        <groupId>io.github.openfeign</groupId>
+        <artifactId>feign-micrometer</artifactId>
+    </dependency>
+```
+### 3. Configure Application Properties
+In each service's `application.yml`, add the following configuration to point to the Zipkin server:
+```yml
+#Zipkin config
 management:
+  tracing:
+    sampling:
+      probability: 1.0 # 100% sampling for demonstration; adjust as needed
+  #Actuator config
   endpoints:
     web:
       exposure:
-        include: health,info,circuitbreakers,metrics
-  endpoint:
-    health:
-      show-details: always
+        include: "*"
 ```
-You can access the circuit breaker status at the following endpoint:
-`http://localhost:8080/actuator/circuitbreakers`
-This endpoint provides information about the state of each circuit breaker, including metrics like the number of successful and failed calls.
-You can also access detailed metrics at:
-`http://localhost:8080/actuator/metrics/resilience4j.circuitbreaker.calls`
+### 4. Add OpenFeign Micrometer Capability
+If you are using OpenFeign for inter-service communication, you need to add Micrometer capability to it.
+**Create a configuration class in each service that uses OpenFeign (e.g., `user-service`, `department-service`):**
+```java
+import feign.Capability;
+import feign.micrometer.MicrometerCapability;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
-## Testing Integration
-1. Start `discovery-service`, `config-server`, `api-gatway`, `user-service`, and `department-service`.
-2. Make a request to `user-service` to fetch a user along with their department details.
-   `http://localhost:8080/api/v1/users/1/with-department`
-3. Simulate failures in `department-service` (e.g., stop the service or introduce delays).
-4. Observe how `user-service` handles the failures using retries, circuit breakers, and fallbacks.
+@Configuration
+public class Config {
+    @Bean
+    public Capability capability(final MeterRegistry registry) {
+        return new MicrometerCapability(registry);
+    }
+}
+```
+
+## Testing the Setup
+1. Start the Zipkin server.
+2. Start all your microservices (`discovery-server`, `config-server`, `api-gateway`, `user-service`, `department-service`).
+3. Make a request to the API Gateway that will trigger calls to the other services. For example:
+    ```bash
+       curl http://localhost:8080/api/v1/users/1/with-department
+    ```
+4. Open your browser and navigate to `http://localhost:9411` to access the Zipkin UI.
+5. Use the search functionality to find traces by service name or time range.
+6. Click on a trace to see the detailed timeline of the request, including spans for each service call.
 
 ## Resources
-* [Resilience4j Documentation](https://resilience4j.readme.io/docs/getting-started)
+* [Zipkin Documentation](https://zipkin.io/pages/quickstart.html)
+* [Distributed Tracing Blog](https://www.codingshuttle.com/spring-boot-handbook/microservice-advance-distributed-tracing-using-zipkin-and-micrometer/)
 
 ## Next Step
-For the next part of the series, we will implement distributed tracing using micrometer and Zipkin to trace requests across multiple microservices.
-* [Distributed Tracing](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/distributed-tracing)
+With tracing, we can see where a problem is. The next step is to aggregate all logs from all services into one place to easily see what happened. 
+The next branch will introduce **Centralized Logging with the ELK Stack (Elasticsearch, Logstash, Kibana)**
+* [Centralized Logging](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/centralized-logging)
