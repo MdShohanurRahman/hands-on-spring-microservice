@@ -97,7 +97,9 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserWithDepartmentDto getUserWithDepartment(Long userId) {
+        log.info("Fetching user with id: {}", userId);
         UserDto userDto = getUserById(userId);
+        log.info("Calling Department Service to get department details for departmentId: {}", userDto.getDepartmentId());
         DepartmentDto department = departmentClient.getDepartmentById(userDto.getDepartmentId());
         return new UserWithDepartmentDto(userDto, department);
     }

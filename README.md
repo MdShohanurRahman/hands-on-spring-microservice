@@ -1,150 +1,171 @@
-# Distributed Tracing with Zipkin and Micrometer
+# Centralized Logging with the ELK Stack
 
-This branch introduces **Distributed Tracing**, a method used to profile and monitor applications, especially those built using a **microservices** architecture. We will use **Micrometer** for metrics collection and **Zipkin** for visualizing them.
+This branch introduces **Centralized Logging** using the **ELK Stack** (Elasticsearch, Logstash, Kibana) deployed via Docker Compose. 
+This solves the critical problem of managing logs scattered across dozens of microservices.
 
-## What is Distributed Tracing?
+## What is Centralized Logging?
 
-Distributed tracing is a technique for tracking a request as it propagates through a distributed system, like your microservices. It gives you a complete view of the journey of a single user request, showing you which services it touched, how long each step took, and where errors occurred.
+Centralized logging is the practice of aggregating all log data from every component of a distributed system into a single, unified platform. 
+Instead of SSH-ing into individual servers to read log files, you can search, analyze, and visualize all logs from one place.
 
 ## Why Do We Need It? A Real-Life Scenario
 
-**Scenario:** A user reports that loading their profile page is very slow.
+**Scenario:** You get an alert that the `/api/v1/users/{id}/with-department` API is throwing 500 errors.
 
-**Without Tracing:** You have to manually check the logs of the API Gateway, `user-service`, `department-service`, and any other involved service. Correlating logs for a single request across all these services is like finding a needle in a haystack.
+**Without Centralized Logging:**
+1.  You guess which service might be failing.
+2.  You SSH into the server running the `user-service`.
+3.  You `grep` through its log files but find nothing relevant.
+4.  You repeat steps 1-3 for the `api-gateway` and `department-service`.
+5.  You finally find an error in the `department-service` logs, but it's missing the context of the original user request. This process is slow and painful.
 
-**With Tracing:** You have a unique **trace ID** assigned to the user's request. You can use this ID in Zipkin's UI to instantly see a visual timeline (a "trace") of the entire request:
-*   You see the request entered through the API Gateway.
-*   You see it took 150ms in the `user-service`.
-*   You see the `user-service` then called the `department-service`, which took 2000ms to respond.
-*   **Instantly, you identify the bottleneck:** The `department-service` is the cause of the slowdown.
+**With Centralized Logging (and Tracing):**
+1.  You open Kibana.
+2.  You filter logs for the `error` severity level.
+3.  You instantly see the error from `department-service`. The log message automatically includes the **Trace ID** from zipkin.
+4.  You click the Trace ID to jump directly to the related trace in Zipkin, seeing the full request flow.
+5.  You use the same Trace ID to filter all logs across *every service* involved in that specific user request. You see the complete story in seconds.
 
-## Key Terminology
+## The ELK Stack
 
-*   **Trace:** The entire journey of a single request, from its starting point (e.g., the API Gateway) through all the services it touches.
-*   **Span:** A single operation within a trace. It represents a unit of work (e.g., an HTTP call, a database query). A trace is a tree of spans.
-*   **Trace ID:** A unique identifier that is assigned to a single request and remains constant as it flows through the system. This is what links all the logs and spans together.
-*   **Span ID:** A unique identifier for a specific operation within a trace.
-*   **Zipkin:** A distributed tracing system that gathers timing data and provides a UI for visualizing traces.
-*   **Micrometer:** A metrics collection library that integrates with various monitoring systems, including Zipkin.
+*   **Elasticsearch:** A distributed, RESTful search and analytics engine. It stores all the log data and enables powerful searching.
+*   **Logstash:** A data processing pipeline. It ingests log data from various sources, transforms it (e.g., parses JSON, adds fields), and sends it to Elasticsearch.
+    This is usually done by:
+    * Writing logs to a file or console and having a **Filebeat** or **Logstash** agent pick them up.**Filebeat** is a lightweight shipper for forwarding and centralizing log data.
+    * Sending logs directly to Logstash over a network (e.g., using TCP or HTTP).
+*   **Kibana:** A visualization layer. It provides a web UI for searching, viewing, and creating dashboards based on the log data in Elasticsearch.
 
 ## How It Works
-
-1.  **Request In:** A request enters the system (e.g., at the API Gateway). Sleuth generates a **Trace ID** and a **Span ID** for it.
-2.  **Propagation:** When one service (e.g., `api-gateway`) calls another (e.g., `user-service`), Sleuth automatically adds the Trace ID and Span ID to the HTTP headers of the outgoing request.
-3.  **Logging:** Each service's logs now contain the `[app-name,trace-id,span-id]` information, making it easy to filter logs for a specific request.
-4.  **Exporting:** Each service sends its timing data (spans) to a **Zipkin server**.
-5.  **Visualization:** You use the Zipkin UI to search for traces by service, time, or even error, and see a detailed timeline of the request's flow.
-
-![zipkin-trace-example](/resources/zipkin-tracing.png)
-
-## Project Changes
-
-We will add Zipkin server and configure all our services to send trace data to it.
+![ELK Stack Architecture](/resources/elk-stack-flow.jpg)
+1. Our Spring Boot applications write structured JSON logs to a file. Sleuth adds `traceId` and `spanId`.
+2. **Logstash** parses the JSON log, adds metadata (e.g., service name), and sends it to **Elasticsearch**.
+3. We use **Kibana** to explore the logs stored in Elasticsearch, creating powerful queries and dashboards.
 
 ## How to Integrate
-### 1. Set Up Zipkin Server
-You can run Zipkin server using Docker. If you have Docker installed, you can start a Zipkin server with the following command:
-```bash
-  docker run -d -p 9411:9411 openzipkin/zipkin
-```
-or use Docker Compose by adding the following service to your [`docker-compose.yml`](./docker-compose.yml):
+### 1. Modify the [`docker-compose.yml`](docker-compose.yml) to include the ELK stack services:
 ```yaml
-   zipkin:
-     container_name: zipkin
-     image: openzipkin/zipkin
-     ports:
-       - "9411:9411"
+  elasticsearch:
+    container_name: elasticsearch
+    image: elasticsearch:8.17.1
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false # Disable security for local development
+      - xpack.monitoring.collection.enabled=true
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data/
+    ports:
+      - "9200:9200"
+    restart: unless-stopped
+    networks:
+      - microservices-net
+  logstash:
+    container_name: logstash
+    image: logstash:8.17.1
+    volumes:
+      - ./logstash/:/logstash_dir
+    environment:
+      - LS_JAVA_OPTS=-Xmx256m -Xms256m
+    ports:
+      - "5044:5044"
+    depends_on:
+      - elasticsearch
+    command: logstash -f /logstash_dir/pipeline/logstash.conf
+    networks:
+      - microservices-net
+    restart: unless-stopped
+  kibana:
+    container_name: kibana
+    image: kibana:8.17.1
+    ports:
+      - '5601:5601'
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - microservices-net
+    restart: unless-stopped
 ```
-Then run:
-```bash 
-  docker-compose up -d zipkin
-```
-Or alternatively, you can download and run the Zipkin server jar directly:
-```bash
-    wget -O zipkin.jar https://search.maven.org/remotecontent?filepath=io/zipkin/java/zipkin-server/2.23.2/zipkin-server-2.23.2-exec.jar
-    java -jar zipkin.jar
-```
-### 2. Add Dependencies to ALL Services
+### 2. Configure Logstash to parse incoming logs
+Create a [`logstash.conf`](/logstash/pipeline/logstash.conf) file with the following content:
+```plaintext
+input {
+  tcp {
+    port => 5044
+    codec => json
+  }
+}
 
-Every service that should be traced (API Gateway, `user-service`, `department-service`) needs the Sleuth and Zipkin dependencies.
-
-**Add to each service's `pom.xml`:**
-```xml
-    <!-- add actuator if not added  -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-actuator</artifactId>
-    </dependency>
-
-    <!-- Micrometer and Zipkin dependencies -->
-    <dependency>
-        <groupId>io.micrometer</groupId>
-        <artifactId>micrometer-observation</artifactId>
-    </dependency>
-    <dependency>
-        <groupId>io.micrometer</groupId>
-        <artifactId>micrometer-tracing-bridge-brave</artifactId>
-    </dependency>
-    <dependency>
-        <groupId>io.zipkin.reporter2</groupId>
-        <artifactId>zipkin-reporter-brave</artifactId>
-    </dependency>
-
-    <!-- for tracing openfeign outgoing request-->
-    <dependency>
-        <groupId>io.github.openfeign</groupId>
-        <artifactId>feign-micrometer</artifactId>
-    </dependency>
-```
-### 3. Configure Application Properties
-In each service's `application.yml`, add the following configuration to point to the Zipkin server:
-```yml
-#Zipkin config
-management:
-  tracing:
-    sampling:
-      probability: 1.0 # 100% sampling for demonstration; adjust as needed
-  #Actuator config
-  endpoints:
-    web:
-      exposure:
-        include: "*"
-```
-### 4. Add OpenFeign Micrometer Capability
-If you are using OpenFeign for inter-service communication, you need to add Micrometer capability to it.
-**Create a configuration class in each service that uses OpenFeign (e.g., `user-service`, `department-service`):**
-```java
-import feign.Capability;
-import feign.micrometer.MicrometerCapability;
-import io.micrometer.core.instrument.MeterRegistry;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
-@Configuration
-public class Config {
-    @Bean
-    public Capability capability(final MeterRegistry registry) {
-        return new MicrometerCapability(registry);
-    }
+output {
+  elasticsearch {
+    hosts => ["http://elasticsearch:9200"]
+    index => "logs-%{+YYYY.MM.dd}"
+  }
 }
 ```
+### 3. Configure Application Logging
+Configure Spring Boot's Logback to output logs as JSON.
 
-## Testing the Setup
-1. Start the Zipkin server.
-2. Start all your microservices (`discovery-server`, `config-server`, `api-gateway`, `user-service`, `department-service`).
-3. Make a request to the API Gateway that will trigger calls to the other services. For example:
-    ```bash
-       curl http://localhost:8080/api/v1/users/1/with-department
-    ```
-4. Open your browser and navigate to `http://localhost:9411` to access the Zipkin UI.
-5. Use the search functionality to find traces by service name or time range.
-6. Click on a trace to see the detailed timeline of the request, including spans for each service call.
+**Add dependency for Logstash Logback encoder:**
+```xml
+<!-- In each microservice's pom.xml (user, department, api-gateway) -->
+<dependency>
+    <groupId>net.logstash.logback</groupId>
+    <artifactId>logstash-logback-encoder</artifactId>
+    <version>7.4</version>
+</dependency>
+```
+### 4. Update `logback-spring.xml` in each microservice to use JSON format and include Sleuth trace info:
+```xml
+<configuration>
+    <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <destination>localhost:5044</destination> <!-- Send logs to Logstash -->
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
+    </appender>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="LOGSTASH" />
+        <appender-ref ref="CONSOLE" />
+    </root>
+</configuration>
+```
+### What is Logback Appender?
+A Logback appender is a component in Logback (Spring Boot’s default logging framework) responsible for directing log messages 
+to a specific destination, such as a file, console, database, or remote logging system like Logstash.
+
+Common Logback Appenders:
+* **ConsoleAppender:** Outputs log messages to the console (standard output).
+* **FileAppender:** Writes log messages to a specified file.
+* **RollingFileAppender:** Similar to FileAppender but supports log file rotation based on size or date.
+* **SocketAppender:** Sends log messages over a network socket to a remote server.
+* **LogstashTcpSocketAppender:** Specifically designed to send log messages in JSON format to a Logstash instance over TCP.
+
+# Testing Integration
+1. Start the ELK stack and microservices:
+   ```bash
+   docker-compose up -d
+   ```
+2. Access Kibana at `http://localhost:5601` and configure the index pattern to `logs-*`.
+3. Make some API calls to generate logs:
+   ```bash
+   curl http://localhost:8080/api/v1/users/1/with-department
+   ```
+4. In Kibana, navigate to the "Discover" tab to see the aggregated logs from all services.
+5. Use the search bar to filter logs by `traceId`, `service name`, or `error` level.
+
 
 ## Resources
-* [Zipkin Documentation](https://zipkin.io/pages/quickstart.html)
-* [Distributed Tracing Blog](https://www.codingshuttle.com/spring-boot-handbook/microservice-advance-distributed-tracing-using-zipkin-and-micrometer/)
+* [ELK Stack With Docker Guide](https://codingstreams.in/java/spring-boot/logging-and-monitoring/2025/01/26/setup-elk-stack-using-docker-compose.html)
+* [ELK Stack Guide](https://www.codingshuttle.com/spring-boot-handbook/microservice-advance-centralized-logging-with-the-elk-stack/)
 
 ## Next Step
-With tracing, we can see where a problem is. The next step is to aggregate all logs from all services into one place to easily see what happened. 
-The next branch will introduce **Centralized Logging with the ELK Stack (Elasticsearch, Logstash, Kibana)**
-* [Centralized Logging](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/centralized-logging)
+Now that we have centralized logging set up, the next logical step is to implement monitoring and alerting to proactively manage our microservices.
+
+* [Monitoring And Alerting](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/monitor)
