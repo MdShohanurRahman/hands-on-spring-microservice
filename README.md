@@ -63,7 +63,7 @@ Instead of SSH-ing into individual servers to read log files, you can search, an
     container_name: logstash
     image: logstash:8.17.1
     volumes:
-      - ./logstash/:/logstash_dir
+      - ./docker/logstash/:/logstash_dir
     environment:
       - LS_JAVA_OPTS=-Xmx256m -Xms256m
     ports:
@@ -88,7 +88,7 @@ Instead of SSH-ing into individual servers to read log files, you can search, an
     restart: unless-stopped
 ```
 ### 2. Configure Logstash to parse incoming logs
-Create a [`logstash.conf`](/logstash/pipeline/logstash.conf) file with the following content:
+Create a [`logstash.conf`](/docker/logstash/pipeline/logstash.conf) file with the following content:
 ```plaintext
 input {
   tcp {

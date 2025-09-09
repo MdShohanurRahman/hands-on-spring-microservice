@@ -39,7 +39,7 @@ services:
     container_name: logstash
     image: logstash:8.17.1
     volumes:
-      - ./logstash/:/logstash_dir
+      - ./docker/logstash/:/logstash_dir
     environment:
       - LS_JAVA_OPTS=-Xmx256m -Xms256m
     ports:
