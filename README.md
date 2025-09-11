@@ -108,7 +108,7 @@ management:
       endpoint: http://localhost:9411/api/v2/spans
   tracing:
     sampling:
-      probability: 1.0
+      probability: 1.0 # 100% sampling for demonstration; adjust as needed
 
 # Correlation IDs for tracing in logs
 logging:
