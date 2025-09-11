@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 2s # How frequently to scrape targets by default.
+  evaluation_interval: 2s # How frequently to evaluate rules.
+
+scrape_configs:
+  # Job for Prometheus itself
+  - job_name: "prometheus"
+    static_configs:
+      - targets: [ "localhost:9090" ] # Prometheus's own metrics endpoint
+  - job_name: 'user-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8081'] # Replace with your user-service host and port
+        labels:
+          application: user-service
+  - job_name: 'department-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8082'] # Replace with your department-service host and port
+        labels:
+          application: department-service

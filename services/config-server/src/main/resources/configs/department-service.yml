@@ -28,11 +28,24 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,circuitbreakers,metrics
+        include: health,info,circuitbreakers,metrics,prometheus
   endpoint:
     health:
       show-details: always
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http:
+          server:
+            requests: true
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
   tracing:
     enabled: true
     sampling:
       probability: 0.1
+
+logging:
+  pattern:
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
