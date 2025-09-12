@@ -43,10 +43,6 @@ We integrate a modern observability stack:
 4.  **Grafana** is configured with data sources for Prometheus, Loki, and Tempo, allowing you to create correlated dashboards.
 5.  **Prometheus** evaluates alerting rules and fires alerts to Alert Manager.
 
-## Project Changes
-
-We introduce a new `docker-compose.monitoring.yml` file to spin up the entire Grafana stack. We also configure our microservices to expose metrics and use Loki-friendly logging.
-
 ## How to Integrate
 
 ### 1. Add Dependencies
