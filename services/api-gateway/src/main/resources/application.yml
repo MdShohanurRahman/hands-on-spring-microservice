@@ -7,6 +7,16 @@ spring:
     gateway:
       server:
         webflux:
+          globalcors:
+            corsConfigurations:
+              '[/**]':
+                allowedOrigins: "*" # Adjust as needed for security
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                  - OPTIONS
           routes:
             - id: user-service
               uri: lb://user-service
@@ -16,6 +26,13 @@ spring:
               uri: lb://department-service
               predicates:
                 - Path=/api/v1/departments/**
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://dev-1spgkyzchsjzz7md.us.auth0.com/
+          audiences:
+            - https://dev-1spgkyzchsjzz7md.us.auth0.com/api/v2/
 eureka:
   client:
     service-url:

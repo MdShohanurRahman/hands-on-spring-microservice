@@ -19,6 +19,13 @@ spring:
     openfeign:
       circuitbreaker:
         enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://dev-1spgkyzchsjzz7md.us.auth0.com/
+          audiences:
+            - https://dev-1spgkyzchsjzz7md.us.auth0.com/api/v2/
 
 eureka:
   client:
