@@ -2,17 +2,16 @@ package com.example.department_service.controller;
 
 import com.example.department_service.dto.DepartmentDto;
 import com.example.department_service.service.DepartmentService;
-import org.springframework.cloud.client.discovery.DiscoveryClient;
-import org.springframework.cloud.client.ServiceInstance;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestClient;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/departments")
+@Tag(name = "Department Controller", description = "Endpoints for managing departments")
 public class DepartmentController {
 
     private final DepartmentService departmentService;

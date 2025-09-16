@@ -3,14 +3,17 @@ package com.example.user_service.controller;
 import com.example.user_service.dto.UserDto;
 import com.example.user_service.dto.UserWithDepartmentDto;
 import com.example.user_service.service.UserService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.swing.text.html.HTML;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/users")
+@Tag(name = "User Controller", description = "Endpoints for managing users")
 public class UserController {
 
     private final UserService userService;

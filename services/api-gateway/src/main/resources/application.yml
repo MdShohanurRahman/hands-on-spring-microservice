@@ -21,11 +21,11 @@ spring:
             - id: user-service
               uri: lb://user-service
               predicates:
-                - Path=/api/v1/users/**
+                - Path=/api/v1/users/**, /user-service/api-docs/**
             - id: department-service
               uri: lb://department-service
               predicates:
-                - Path=/api/v1/departments/**
+                - Path=/api/v1/departments/**, /department-service/api-docs/**
   security:
     oauth2:
       resourceserver:
@@ -45,3 +45,13 @@ management:
     enabled: true
     sampling:
       probability: 0.1
+
+springdoc:
+  swagger-ui:
+    path: /
+    urls:
+      - name: User Service
+        url: /user-service/api-docs # configured route
+      - name: Department Service
+        url: /department-service/api-docs
+    enabled: true

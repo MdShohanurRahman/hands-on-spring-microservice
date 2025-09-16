@@ -26,8 +26,19 @@ public class SecurityConfig {
                     return corsConfig;
                 }))
                 .authorizeExchange(exchanges -> exchanges
-                        .pathMatchers("/actuator/**").permitAll() // Allow public access to certain paths
-                        .anyExchange().authenticated() // Require authentication for all other paths
+                        .pathMatchers(
+                                "/",
+                                "/actuator/**",
+                                "/webjars/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/user-service/api-docs/**",
+                                "/department-service/api-docs/**"
+                        )
+                        .permitAll() // Allow public access to certain paths
+                        .anyExchange()
+                        .authenticated() // Require authentication for all other paths
                 )
                 .oauth2ResourceServer(oAuth2ResourceServerSpec -> {
                     oAuth2ResourceServerSpec

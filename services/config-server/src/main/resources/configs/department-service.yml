@@ -56,3 +56,9 @@ management:
 logging:
   pattern:
     correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    path: /department-service/api-docs
