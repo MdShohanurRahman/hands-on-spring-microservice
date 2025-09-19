@@ -16,11 +16,12 @@ Follow the branches in order to build the system incrementally:
 8. **[`Centralized Logging`](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/centralized-logging)**: Setting up centralized logging with ELK Stack (Elasticsearch, Logstash, Kibana).
 9. **[`Monitoring & Alerting`](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/monitor)**: Setting up monitoring and alerting with Prometheus and Grafana.
 10. **[`Security`](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/security)**: Implementing security with Spring Security and OAuth2.
-11. **[`Containerization & CI/CD Pipeline`](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/containerization)**: Containerizing microservices with Docker and setting up a CI/CD pipeline with GitHub Actions.
-12. **[`Asynchronous Communication`](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/async-communication)**: Implementing asynchronous communication with RabbitMQ, and Kafka. (Event-driven architecture)
-13. **[`Distributed Transaction Management`](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/distributed-transaction)**: Handling distributed transactions with Saga pattern.
-14. **[`Testing Microservices`](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/testing)**: Writing unit and integration tests for microservices.
-15. **[`Performance Optimization`](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/performance-optimization)**: Techniques for optimizing microservice performance.
+11. **[`Spring Doc Open api`](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/open-api)**: Api Documentation using swagger.
+12. **[`Containerization & CI/CD Pipeline`](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/containerization)**: Containerizing microservices with Docker and setting up a CI/CD pipeline with GitHub Actions.
+13. **[`Asynchronous Communication`](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/async-communication)**: Implementing asynchronous communication with RabbitMQ, and Kafka. (Event-driven architecture)
+14. **[`Distributed Transaction Management`](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/distributed-transaction)**: Handling distributed transactions with Saga pattern.
+15. **[`Testing Microservices`](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/testing)**: Writing unit and integration tests for microservices.
+16. **[`Performance Optimization`](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/performance-optimization)**: Techniques for optimizing microservice performance.
 
 ## 🛠️ Technology Stack
 
