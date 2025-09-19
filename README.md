@@ -117,4 +117,4 @@ public class SecurityConfig {
 
 ## Next Step
 Api Documentation with Swagger & OpenAPI
-* [Api Documentation](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/swagger)
+* [Api Documentation](https://github.com/MdShohanurRahman/hands-on-spring-microservice/tree/open-api)
